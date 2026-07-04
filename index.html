@@ -57,6 +57,16 @@
     -moz-appearance:textfield;
   }
   input:focus{outline:2px solid var(--blue);border-color:var(--blue);}
+  select{
+    width:100%;
+    font-size:18px;
+    padding:12px 14px;
+    border-radius:12px;
+    border:1px solid #d1d1d6;
+    background:#fafafa;
+    color:var(--text);
+  }
+  select:focus{outline:2px solid var(--blue);border-color:var(--blue);}
   .row{display:flex;gap:10px;}
   .row > *{flex:1;}
   label{font-size:13px;color:var(--sub);display:block;margin:10px 0 4px;}
@@ -178,15 +188,6 @@
     <input type="text" id="budgetInput" inputmode="numeric" placeholder="例：1000">
   </div>
 
-  <div class="card">
-    <h2>税設定</h2>
-    <div class="tax-toggle">
-      <button data-tax="included" class="active">税込</button>
-      <button data-tax="8">税抜8%</button>
-      <button data-tax="10">税抜10%</button>
-    </div>
-  </div>
-
   <div id="summaryPanel" class="summary-panel ok">
     <div class="summary-grid">
       <div class="summary-item">
@@ -211,6 +212,14 @@
   <div class="card">
     <h2>あと何個買える？</h2>
     <input type="text" id="calcPrice" inputmode="numeric" placeholder="商品価格を入力">
+    <label>税率</label>
+    <select id="calcTax">
+      <option value="included">税込（そのままの価格）</option>
+      <option value="0">0%</option>
+      <option value="1">1%</option>
+      <option value="8" selected>8%（軽減税率）</option>
+      <option value="10">10%（標準税率）</option>
+    </select>
     <div class="calc-result" id="calcResult">価格を入力すると表示されます</div>
   </div>
 
@@ -218,7 +227,7 @@
     <h2>商品一覧</h2>
     <table id="productTable">
       <thead>
-        <tr><th>商品名</th><th class="num">単価</th><th class="num">個数</th><th class="num">小計</th><th></th></tr>
+        <tr><th>商品名</th><th class="num">単価</th><th class="num">税率</th><th class="num">個数</th><th class="num">小計</th><th></th></tr>
       </thead>
       <tbody id="productTbody"></tbody>
     </table>
@@ -250,6 +259,14 @@
     <input type="text" id="manualPrice" inputmode="numeric" placeholder="例：108">
     <label>個数</label>
     <input type="text" id="manualQty" inputmode="numeric" value="1">
+    <label>税率</label>
+    <select id="manualTax">
+      <option value="included">税込（そのままの価格）</option>
+      <option value="0">0%</option>
+      <option value="1">1%</option>
+      <option value="8" selected>8%（軽減税率）</option>
+      <option value="10">10%（標準税率）</option>
+    </select>
     <div class="btn-row">
       <button class="btn btn-success" id="manualAddBtn">追加する</button>
     </div>
@@ -277,6 +294,14 @@
     <input type="text" id="bcPrice" inputmode="numeric" placeholder="例：108">
     <label>個数</label>
     <input type="text" id="bcQty" inputmode="numeric" value="1">
+    <label>税率</label>
+    <select id="bcTax">
+      <option value="included">税込（そのままの価格）</option>
+      <option value="0">0%</option>
+      <option value="1">1%</option>
+      <option value="8" selected>8%（軽減税率）</option>
+      <option value="10">10%（標準税率）</option>
+    </select>
     <div class="btn-row">
       <button class="btn btn-success" id="bcAddBtn">追加する</button>
     </div>
@@ -291,15 +316,13 @@
   var STORAGE = {
     dict: "budgetCago_barcodeDict",
     budget: "budgetCago_lastBudget",
-    products: "budgetCago_products",
-    tax: "budgetCago_taxMode"
+    products: "budgetCago_products"
   };
 
   var state = {
     budget: 0,
-    taxMode: "included", // "included" | "8" | "10"
-    products: [], // {id, name, price, qty, barcode}
-    dict: {} // barcode -> {name, price}
+    products: [], // {id, name, price, qty, barcode, taxRate}
+    dict: {} // barcode -> {name, price, taxRate}
   };
 
   var currentBarcode = null;
@@ -310,27 +333,30 @@
       state.dict = JSON.parse(localStorage.getItem(STORAGE.dict) || "{}");
       state.budget = Number(localStorage.getItem(STORAGE.budget) || 0);
       state.products = JSON.parse(localStorage.getItem(STORAGE.products) || "[]");
-      state.taxMode = localStorage.getItem(STORAGE.tax) || "included";
     }catch(e){
-      state.dict = {}; state.budget = 0; state.products = []; state.taxMode = "included";
+      state.dict = {}; state.budget = 0; state.products = [];
     }
+    state.products.forEach(function(p){ if(!p.taxRate) p.taxRate = "included"; });
+    Object.keys(state.dict).forEach(function(code){ if(!state.dict[code].taxRate) state.dict[code].taxRate = "included"; });
   }
 
   function save(){
     localStorage.setItem(STORAGE.dict, JSON.stringify(state.dict));
     localStorage.setItem(STORAGE.budget, String(state.budget));
     localStorage.setItem(STORAGE.products, JSON.stringify(state.products));
-    localStorage.setItem(STORAGE.tax, state.taxMode);
   }
 
-  function taxMultiplier(){
-    if(state.taxMode === "8") return 1.08;
-    if(state.taxMode === "10") return 1.10;
-    return 1;
+  function taxMultiplier(taxRate){
+    if(taxRate === "included") return 1;
+    return 1 + (Number(taxRate) / 100);
   }
 
-  function chargedPrice(basePrice){
-    return Math.floor(basePrice * taxMultiplier());
+  function taxLabel(taxRate){
+    return taxRate === "included" ? "税込" : taxRate + "%";
+  }
+
+  function chargedPrice(basePrice, taxRate){
+    return Math.floor(basePrice * taxMultiplier(taxRate));
   }
 
   function yen(n){
@@ -357,15 +383,12 @@
 
   function totalAmount(){
     return state.products.reduce(function(sum, p){
-      return sum + chargedPrice(p.price) * p.qty;
+      return sum + chargedPrice(p.price, p.taxRate) * p.qty;
     }, 0);
   }
 
   function render(){
     document.getElementById("budgetInput").value = state.budget ? comma(state.budget) : "";
-    document.querySelectorAll(".tax-toggle button").forEach(function(btn){
-      btn.classList.toggle("active", btn.dataset.tax === state.taxMode);
-    });
 
     var total = totalAmount();
     var remaining = state.budget - total;
@@ -394,12 +417,13 @@
       emptyMsg.classList.add("hidden");
     }
     state.products.forEach(function(p){
-      var unit = chargedPrice(p.price);
+      var unit = chargedPrice(p.price, p.taxRate);
       var subtotal = unit * p.qty;
       var tr = document.createElement("tr");
       tr.innerHTML =
         "<td>" + escapeHtml(p.name) + "</td>" +
         "<td class='num'>" + yen(unit) + "</td>" +
+        "<td class='num'>" + taxLabel(p.taxRate) + "</td>" +
         "<td class='num'>" + comma(p.qty) + "</td>" +
         "<td class='num'>" + yen(subtotal) + "</td>" +
         "<td><button class='del-btn' data-id='" + p.id + "'>✕</button></td>";
@@ -429,7 +453,8 @@
       resultEl.innerHTML = "残り " + yen(Math.max(remaining,0)) + "<br>すでに予算オーバーです";
       return;
     }
-    var unit = chargedPrice(price);
+    var taxRate = document.getElementById("calcTax").value;
+    var unit = chargedPrice(price, taxRate);
     var count = Math.floor(remaining / unit);
     var after = remaining - unit * count;
     resultEl.innerHTML =
@@ -452,20 +477,12 @@
     e.target.setSelectionRange(e.target.value.length, e.target.value.length);
   });
 
-  // ---- 税設定 ----
-  document.querySelectorAll(".tax-toggle button").forEach(function(btn){
-    btn.addEventListener("click", function(){
-      state.taxMode = btn.dataset.tax;
-      save();
-      render();
-    });
-  });
-
   // ---- あと何個買える？ ----
   document.getElementById("calcPrice").addEventListener("input", function(e){
     formatInputValue(e.target);
     renderCalc();
   });
+  document.getElementById("calcTax").addEventListener("change", renderCalc);
 
   // ---- モーダル制御 ----
   function show(id){ document.getElementById(id).classList.remove("hidden"); }
@@ -484,6 +501,7 @@
     document.getElementById("manualName").value = "";
     document.getElementById("manualPrice").value = "";
     document.getElementById("manualQty").value = "1";
+    document.getElementById("manualTax").value = "8";
     show("manualOverlay");
   });
   document.getElementById("closeManual").addEventListener("click", function(){
@@ -493,11 +511,12 @@
     var name = document.getElementById("manualName").value.trim() || "商品";
     var price = parseNum(document.getElementById("manualPrice").value);
     var qty = parseNum(document.getElementById("manualQty").value) || 1;
+    var taxRate = document.getElementById("manualTax").value;
     if(!price || price <= 0){
       alert("価格を入力してください");
       return;
     }
-    state.products.push({ id: Date.now(), name: name, price: price, qty: qty, barcode: null });
+    state.products.push({ id: Date.now(), name: name, price: price, qty: qty, barcode: null, taxRate: taxRate });
     save();
     render();
     hide("manualOverlay");
@@ -552,16 +571,19 @@
     var nameInput = document.getElementById("bcName");
     var priceInput = document.getElementById("bcPrice");
     var qtyInput = document.getElementById("bcQty");
+    var taxInput = document.getElementById("bcTax");
     qtyInput.value = "1";
 
     if(known){
       title.textContent = "商品情報（登録済み）";
       nameInput.value = known.name;
       priceInput.value = comma(known.price);
+      taxInput.value = known.taxRate || "8";
     }else{
       title.textContent = "はじめての商品です";
       nameInput.value = "";
       priceInput.value = "";
+      taxInput.value = "8";
     }
     show("barcodeFormOverlay");
   }
@@ -575,12 +597,13 @@
     var name = document.getElementById("bcName").value.trim() || "商品";
     var price = parseNum(document.getElementById("bcPrice").value);
     var qty = parseNum(document.getElementById("bcQty").value) || 1;
+    var taxRate = document.getElementById("bcTax").value;
     if(!price || price <= 0){
       alert("価格を入力してください");
       return;
     }
-    state.dict[currentBarcode] = { name: name, price: price };
-    state.products.push({ id: Date.now(), name: name, price: price, qty: qty, barcode: currentBarcode });
+    state.dict[currentBarcode] = { name: name, price: price, taxRate: taxRate };
+    state.products.push({ id: Date.now(), name: name, price: price, qty: qty, barcode: currentBarcode, taxRate: taxRate });
     save();
     render();
     hide("barcodeFormOverlay");
