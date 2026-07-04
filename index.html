@@ -244,8 +244,8 @@
 <div class="overlay hidden" id="manualOverlay">
   <div class="modal">
     <h3>手入力で追加</h3>
-    <label>商品名</label>
-    <input type="text" id="manualName" placeholder="例：アイス">
+    <label>商品名（任意）</label>
+    <input type="text" id="manualName" placeholder="例：アイス（未入力でもOK）">
     <label>価格</label>
     <input type="number" id="manualPrice" inputmode="numeric" placeholder="例：108">
     <label>個数</label>
@@ -271,8 +271,8 @@
 <div class="overlay hidden" id="barcodeFormOverlay">
   <div class="modal">
     <h3 id="barcodeFormTitle">商品情報</h3>
-    <label>商品名</label>
-    <input type="text" id="bcName" placeholder="例：アイス">
+    <label>商品名（任意）</label>
+    <input type="text" id="bcName" placeholder="例：アイス（未入力でもOK）">
     <label>価格</label>
     <input type="number" id="bcPrice" inputmode="numeric" placeholder="例：108">
     <label>個数</label>
@@ -468,11 +468,11 @@
     hide("manualOverlay");
   });
   document.getElementById("manualAddBtn").addEventListener("click", function(){
-    var name = document.getElementById("manualName").value.trim();
+    var name = document.getElementById("manualName").value.trim() || "商品";
     var price = Number(document.getElementById("manualPrice").value);
     var qty = Number(document.getElementById("manualQty").value) || 1;
-    if(!name || !price || price <= 0){
-      alert("商品名と価格を入力してください");
+    if(!price || price <= 0){
+      alert("価格を入力してください");
       return;
     }
     state.products.push({ id: Date.now(), name: name, price: price, qty: qty, barcode: null });
@@ -550,11 +550,11 @@
   });
 
   document.getElementById("bcAddBtn").addEventListener("click", function(){
-    var name = document.getElementById("bcName").value.trim();
+    var name = document.getElementById("bcName").value.trim() || "商品";
     var price = Number(document.getElementById("bcPrice").value);
     var qty = Number(document.getElementById("bcQty").value) || 1;
-    if(!name || !price || price <= 0){
-      alert("商品名と価格を入力してください");
+    if(!price || price <= 0){
+      alert("価格を入力してください");
       return;
     }
     state.dict[currentBarcode] = { name: name, price: price };
