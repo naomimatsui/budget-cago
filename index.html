@@ -175,7 +175,7 @@
 
   <div class="card">
     <h2>予算</h2>
-    <input type="number" id="budgetInput" inputmode="numeric" placeholder="例：1000">
+    <input type="text" id="budgetInput" inputmode="numeric" placeholder="例：1000">
   </div>
 
   <div class="card">
@@ -210,7 +210,7 @@
 
   <div class="card">
     <h2>あと何個買える？</h2>
-    <input type="number" id="calcPrice" inputmode="numeric" placeholder="商品価格を入力">
+    <input type="text" id="calcPrice" inputmode="numeric" placeholder="商品価格を入力">
     <div class="calc-result" id="calcResult">価格を入力すると表示されます</div>
   </div>
 
@@ -247,9 +247,9 @@
     <label>商品名（任意）</label>
     <input type="text" id="manualName" placeholder="例：アイス（未入力でもOK）">
     <label>価格</label>
-    <input type="number" id="manualPrice" inputmode="numeric" placeholder="例：108">
+    <input type="text" id="manualPrice" inputmode="numeric" placeholder="例：108">
     <label>個数</label>
-    <input type="number" id="manualQty" inputmode="numeric" value="1">
+    <input type="text" id="manualQty" inputmode="numeric" value="1">
     <div class="btn-row">
       <button class="btn btn-success" id="manualAddBtn">追加する</button>
     </div>
@@ -274,9 +274,9 @@
     <label>商品名（任意）</label>
     <input type="text" id="bcName" placeholder="例：アイス（未入力でもOK）">
     <label>価格</label>
-    <input type="number" id="bcPrice" inputmode="numeric" placeholder="例：108">
+    <input type="text" id="bcPrice" inputmode="numeric" placeholder="例：108">
     <label>個数</label>
-    <input type="number" id="bcQty" inputmode="numeric" value="1">
+    <input type="text" id="bcQty" inputmode="numeric" value="1">
     <div class="btn-row">
       <button class="btn btn-success" id="bcAddBtn">追加する</button>
     </div>
@@ -337,6 +337,24 @@
     return "¥" + Math.round(n).toLocaleString("ja-JP");
   }
 
+  function comma(n){
+    return Math.round(n).toLocaleString("ja-JP");
+  }
+
+  function parseNum(v){
+    return Number(String(v).replace(/,/g, "")) || 0;
+  }
+
+  function formatInputValue(input){
+    var raw = input.value.replace(/[^0-9]/g, "");
+    input.value = raw === "" ? "" : Number(raw).toLocaleString("ja-JP");
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+
+  function attachCommaFormatting(input){
+    input.addEventListener("input", function(){ formatInputValue(input); });
+  }
+
   function totalAmount(){
     return state.products.reduce(function(sum, p){
       return sum + chargedPrice(p.price) * p.qty;
@@ -344,7 +362,7 @@
   }
 
   function render(){
-    document.getElementById("budgetInput").value = state.budget || "";
+    document.getElementById("budgetInput").value = state.budget ? comma(state.budget) : "";
     document.querySelectorAll(".tax-toggle button").forEach(function(btn){
       btn.classList.toggle("active", btn.dataset.tax === state.taxMode);
     });
@@ -382,7 +400,7 @@
       tr.innerHTML =
         "<td>" + escapeHtml(p.name) + "</td>" +
         "<td class='num'>" + yen(unit) + "</td>" +
-        "<td class='num'>" + p.qty + "</td>" +
+        "<td class='num'>" + comma(p.qty) + "</td>" +
         "<td class='num'>" + yen(subtotal) + "</td>" +
         "<td><button class='del-btn' data-id='" + p.id + "'>✕</button></td>";
       tbody.appendChild(tr);
@@ -400,7 +418,7 @@
   function renderCalc(){
     var priceInput = document.getElementById("calcPrice");
     var resultEl = document.getElementById("calcResult");
-    var price = Number(priceInput.value);
+    var price = parseNum(priceInput.value);
     if(!price || price <= 0){
       resultEl.textContent = "価格を入力すると表示されます";
       return;
@@ -416,7 +434,7 @@
     var after = remaining - unit * count;
     resultEl.innerHTML =
       "残り" + yen(remaining) + "<br>" +
-      "<span class='big'>" + yen(unit) + "の商品は" + count + "個まで買える</span><br>" +
+      "<span class='big'>" + yen(unit) + "の商品は" + comma(count) + "個まで買える</span><br>" +
       "残り" + yen(after);
   }
 
@@ -428,9 +446,10 @@
 
   // ---- 予算入力 ----
   document.getElementById("budgetInput").addEventListener("input", function(e){
-    state.budget = Number(e.target.value) || 0;
+    state.budget = parseNum(e.target.value);
     save();
     render();
+    e.target.setSelectionRange(e.target.value.length, e.target.value.length);
   });
 
   // ---- 税設定 ----
@@ -443,7 +462,10 @@
   });
 
   // ---- あと何個買える？ ----
-  document.getElementById("calcPrice").addEventListener("input", renderCalc);
+  document.getElementById("calcPrice").addEventListener("input", function(e){
+    formatInputValue(e.target);
+    renderCalc();
+  });
 
   // ---- モーダル制御 ----
   function show(id){ document.getElementById(id).classList.remove("hidden"); }
@@ -469,8 +491,8 @@
   });
   document.getElementById("manualAddBtn").addEventListener("click", function(){
     var name = document.getElementById("manualName").value.trim() || "商品";
-    var price = Number(document.getElementById("manualPrice").value);
-    var qty = Number(document.getElementById("manualQty").value) || 1;
+    var price = parseNum(document.getElementById("manualPrice").value);
+    var qty = parseNum(document.getElementById("manualQty").value) || 1;
     if(!price || price <= 0){
       alert("価格を入力してください");
       return;
@@ -535,7 +557,7 @@
     if(known){
       title.textContent = "商品情報（登録済み）";
       nameInput.value = known.name;
-      priceInput.value = known.price;
+      priceInput.value = comma(known.price);
     }else{
       title.textContent = "はじめての商品です";
       nameInput.value = "";
@@ -551,8 +573,8 @@
 
   document.getElementById("bcAddBtn").addEventListener("click", function(){
     var name = document.getElementById("bcName").value.trim() || "商品";
-    var price = Number(document.getElementById("bcPrice").value);
-    var qty = Number(document.getElementById("bcQty").value) || 1;
+    var price = parseNum(document.getElementById("bcPrice").value);
+    var qty = parseNum(document.getElementById("bcQty").value) || 1;
     if(!price || price <= 0){
       alert("価格を入力してください");
       return;
@@ -564,6 +586,12 @@
     hide("barcodeFormOverlay");
     currentBarcode = null;
   });
+
+  // ---- カンマ区切り入力 ----
+  attachCommaFormatting(document.getElementById("manualPrice"));
+  attachCommaFormatting(document.getElementById("manualQty"));
+  attachCommaFormatting(document.getElementById("bcPrice"));
+  attachCommaFormatting(document.getElementById("bcQty"));
 
   // ---- 初期化 ----
   load();
